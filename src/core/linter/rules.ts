@@ -46,6 +46,11 @@ export const LINT_RULES: LintRuleMeta[] = [
   r('YL405', 'duplicate-meta', 'warning', 'A meta key is defined more than once.'),
   r('YL406', 'meta-key-typo', 'info', 'A meta key is not used elsewhere in the workspace but is close to a common key (possible typo).'),
   r('YL407', 'duplicate-rule-identity', 'error', 'rule name or meta rule_id duplicates another rule in the workspace.'),
+  r('YL408', 'mitre-unknown-id', 'warning', 'tactic/technique value is not a valid ID in the enabled MITRE frameworks (ATT&CK Enterprise, ICS, Mobile, ATLAS).'),
+  r('YL409', 'mitre-deprecated', 'warning', 'MITRE technique is revoked or deprecated; revoked techniques link to their replacement.'),
+  r('YL410', 'mitre-name-instead-of-id', 'warning', 'Use MITRE IDs (TA0006, T1110, AML.T0051) rather than names in tactic/technique meta.'),
+  r('YL411', 'mitre-tactic-mismatch', 'info', 'None of the technique\'s tactics are listed in the rule\'s tactic meta.'),
+  r('YL412', 'mitre-meta-key', 'info', 'Use the configured MITRE meta keys (tactic/technique by default) instead of alternatives such as mitre_attack_tactic.'),
 
   r('YL501', 'missing-required-outcome', 'warning', 'An outcome variable required by .yaral-lint.json is missing.'),
   r('YL502', 'missing-conventional-outcome', 'info', 'An outcome variable used by most rules in the workspace is missing.'),

@@ -9,8 +9,9 @@ It's built for detection-as-code teams. The same engine runs in the editor and i
 | Area | What you get |
 |---|---|
 | **Highlighting** | TextMate grammar: sections, meta keys, event/placeholder/count variables, UDM field paths, `%reference_lists`, regex literals (vs. division), raw strings, durations, functions, case-insensitive `AND`/`OR`/`NOT`. |
-| **Linting** | 42 rules ([docs/lint-rules.md](docs/lint-rules.md)): syntax, section order, undefined or unused variables, match windows, non-aggregated outcomes, unknown functions and argument counts, RE2 regex validity, required/allowed meta values, severity↔`$risk_score`, performance hints, whitespace. |
+| **Linting** | 47 rules ([docs/lint-rules.md](docs/lint-rules.md)): syntax, section order, undefined or unused variables, match windows, non-aggregated outcomes, unknown functions and argument counts, RE2 regex validity, required/allowed meta values, severity↔`$risk_score`, performance hints, whitespace. |
 | **Workspace conventions** | Indexes every `.yaral` file to find standard meta keys and outcome variables (default: present in ≥80% of rules). Flags missing ones and offers them as completions with the team's usual expression. Also catches meta-key typos (`sevirity`) and duplicate rule names / `rule_id`s across the repo. |
+| **MITRE ATT&CK & ATLAS** | Validates `tactic` / `technique` meta against ATT&CK **Enterprise**, **ICS** and **Mobile** (v19.2) and **ATLAS** (AI systems, 2026.09). Catches unknown IDs, revoked techniques (fixed to their replacement), names used instead of IDs, and techniques outside the listed tactics. Hover shows names and links; completion matches by ID or name. Coverage report and ATT&CK Navigator layer export. |
 | **Function docs** | Hover docs, signature help and completion for every built-in function (`strings.*`, `re.*`, `net.*`, `math.*`, `timestamp.*`, `arrays.*`, `cast.*`, `window.*`, outcome aggregates…). Custom entries can be added in config. |
 | **Completion** | UDM field paths after `$event.` (from ~900 real rules), `metadata.event_type` / `entity_type` / `source_type` / `security_result.action` enums, rule variables, reference lists used elsewhere in the repo, meta keys and values, section headers. |
 | **Navigation** | Outline (rule → sections → meta / variables / outcomes), go to definition, find references, highlight, **rename variable**, folding. |
@@ -26,7 +27,7 @@ npm ci
 npm run build          # dist/extension.js + dist/cli.js
 npm test
 npm run package        # builds yaral-toolkit-<version>.vsix
-code --install-extension yaral-toolkit-0.1.0.vsix
+code --install-extension yaral-toolkit-0.2.0.vsix
 ```
 
 To develop the extension, open this folder in VS Code and press **F5**. That launches an Extension Development Host on `examples/`.
@@ -36,6 +37,8 @@ Rule files are recognized by extension: `.yaral`, `.yara-l`, `.yl2`.
 ### Commands
 
 - **YARA-L: Show Workspace Conventions Report**: meta-key / outcome coverage, common values and duplicates (also opened from the status-bar item).
+- **YARA-L: Show MITRE ATT&CK / ATLAS Coverage**: tactic/technique coverage per framework, plus rules with no mapping.
+- **YARA-L: Export ATT&CK Navigator Layer**: a layer file (Enterprise, ICS or Mobile) to open in the [ATT&CK Navigator](https://mitre-attack.github.io/attack-navigator/).
 - **YARA-L: Create .yaral-lint.json From Workspace Conventions**: turns the learned standards into an enforced config.
 - **YARA-L: Lint All Rules in Workspace**: fills the Problems panel for every rule, not just open files.
 - **YARA-L: Insert New rule_id (mr_&lt;uuid&gt;)**
@@ -66,6 +69,13 @@ Put this file at the root of your rules repository. The extension and the CLI bo
   "ignore": ["**/node_modules/**"],
   // Convention learning from the other rules in the repo
   "conventions": { "enabled": true, "threshold": 0.8, "minRules": 5, "exclude": ["**/_deprecated/**"] },
+  // MITRE validation of tactic/technique meta (IDs, comma-separated)
+  "mitre": {
+    "frameworks": ["enterprise", "ics", "mobile", "atlas"],
+    "defaultFramework": "enterprise",   // resolves ambiguous names like "Initial Access"
+    "tacticKey": "tactic",
+    "techniqueKey": "technique"
+  },
   // Teach the linter about functions Google adds before the catalog is updated
   "functions": [
     { "name": "strings.new_function", "params": [{ "name": "text", "type": "string" }], "returns": "string", "description": "…" }
@@ -85,6 +95,7 @@ yaral-lint [lint] [paths...]      Lint .yaral files (default: .)
   --quiet  --fix  --no-conventions  --config <file>
 yaral-lint format [paths...] [--check]
 yaral-lint conventions [paths...] [--json] [--init]
+yaral-lint mitre [paths...] [--json] [--layer layer.json --framework enterprise|ics|mobile]
 yaral-lint rules
 ```
 
@@ -102,6 +113,19 @@ Exit codes: `0` clean, `1` errors / too many warnings / unformatted files, `2` u
 ```
 
 See [examples/github-workflow.yml](examples/github-workflow.yml) and [docs/ci-cd.md](docs/ci-cd.md) for the full detection-as-code pipeline. That includes GitLab CI, pre-commit hooks, and deploying through Google's `content_manager` with the authoritative `verifyRuleText` check.
+
+## MITRE frameworks
+
+Rules map to MITRE with IDs in `tactic` and `technique` meta. A key can hold several comma-separated IDs, and frameworks can be mixed:
+
+```yaral
+tactic = "TA0108, TA0109"          // ATT&CK for ICS
+technique = "T0886"
+tactic = "AML.TA0005"              // ATLAS
+technique = "AML.T0051.000"
+```
+
+The bundled data comes straight from MITRE's official releases ([attack-stix-data](https://github.com/mitre-attack/attack-stix-data) and [atlas-data](https://github.com/mitre-atlas/atlas-data)). Refresh it with `npm run update-mitre`; a monthly workflow does this automatically and opens a PR. Rules that use `mitre_attack_tactic`-style keys get a quick fix to rename them.
 
 ## Scope and accuracy
 
@@ -121,6 +145,10 @@ test/            node:test suites + fixtures
 docs/            lint rule reference, CI/CD guide, research & roadmap
 ```
 
+## License
+
+[MIT](LICENSE). MITRE ATT&CK® and ATLAS™ data is © The MITRE Corporation and is reproduced under MITRE's [terms of use](https://attack.mitre.org/resources/legal-and-branding/terms-of-use/).
+
 ## Roadmap
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) for the research behind the feature set and what's planned next: SecOps API integration (verify, test and deploy rules), full UDM schema and type checking, reference-list / data-table validation, MITRE ATT&CK tooling, rule unit tests, and a language server for other editors.
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the research behind the feature set and what's planned next: SecOps API integration (verify, test and deploy rules), full UDM schema and type checking, reference-list / data-table validation, rule unit tests, deeper MITRE coverage analysis, and a language server for other editors.

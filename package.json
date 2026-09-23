@@ -2,7 +2,7 @@
   "name": "yaral-toolkit",
   "displayName": "YARA-L Toolkit",
   "description": "YARA-L 2.0 language support for Google SecOps detection engineering: syntax highlighting, linting, function docs, workspace convention checks, formatting and a CI/CD linter CLI.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "carlsullivan11",
   "repository": {
     "type": "git",
@@ -24,7 +24,10 @@
     "chronicle",
     "google secops",
     "detection engineering",
-    "siem"
+    "siem",
+    "mitre att&ck",
+    "mitre atlas",
+    "ics"
   ],
   "main": "./dist/extension.js",
   "bin": {
@@ -67,6 +70,14 @@
       {
         "command": "yaral.showConventions",
         "title": "YARA-L: Show Workspace Conventions Report"
+      },
+      {
+        "command": "yaral.showMitreCoverage",
+        "title": "YARA-L: Show MITRE ATT&CK / ATLAS Coverage"
+      },
+      {
+        "command": "yaral.exportNavigatorLayer",
+        "title": "YARA-L: Export ATT&CK Navigator Layer"
       },
       {
         "command": "yaral.refreshConventions",
@@ -143,12 +154,16 @@
     "lint:examples": "node dist/cli.js examples/rules",
     "package": "npm run build && npx @vscode/vsce package",
     "vscode:prepublish": "npm run build",
-    "docs": "tsc -p tsconfig.test.json && node scripts/gen-lint-docs.js"
+    "docs": "tsc -p tsconfig.test.json && node scripts/gen-lint-docs.js",
+    "update-mitre": "node scripts/update-mitre.mjs"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.20.4",
     "@types/vscode": "^1.85.0",
     "esbuild": "^0.28.2",
+    "js-yaml": "^4.3.2",
     "typescript": "^5.9.3"
-  }
+  },
+  "license": "MIT"
 }

@@ -3,6 +3,7 @@ import { arity, buildFunctionIndex, FunctionIndex } from '../catalog/functions';
 import { KNOWN_OPTIONS, SEVERITY_RISK_SCORES } from '../catalog/keywords';
 import { DEFAULT_CONFIG, LintConfig } from '../config';
 import { Conventions } from '../conventions';
+import { ALTERNATE_MITRE_KEYS, findByName, frameworkOfId, isTacticId, isTechniqueId, lookupMitre, MitreFramework, splitMitreValue } from '../mitre';
 import { LineIndex, Range, Token } from '../lexer';
 import { durationSeconds, parse, ParsedDocument, Rule, section, SECTION_ORDER, Section, VarRef } from '../parser';
 import { resolveSeverity, RULES_BY_ID, Severity } from './rules';
@@ -64,6 +65,7 @@ export function lintDocument(doc: ParsedDocument, options: LintOptions = {}): Li
     checkVariables(ctx);
     checkFunctions(ctx);
     checkMeta(ctx);
+    checkMitre(ctx);
     checkOutcomes(ctx);
     checkMatch(ctx);
     checkOptions(ctx);
@@ -484,6 +486,117 @@ function checkMeta(ctx: RuleCtx): void {
       if (d.kind === 'rule_id') {
         const m = rule.meta.find((x) => x.key === 'rule_id' && x.value === d.value);
         if (m) report('YL407', `rule_id '${d.value}' is also used in ${where}`, (m.valueToken ?? m.keyToken).range);
+      }
+    }
+  }
+}
+
+// ------------------------------------------------------------------ MITRE
+
+function checkMitre(ctx: RuleCtx): void {
+  const { rule, config, report } = ctx;
+  const { tacticKey, techniqueKey, frameworks, defaultFramework } = config.mitre;
+  const keys = new Set(rule.meta.map((m) => m.key));
+
+  // YL412 alternative key names
+  for (const m of rule.meta) {
+    const canonical = ALTERNATE_MITRE_KEYS[m.key];
+    if (!canonical) continue;
+    const target = canonical === 'tactic' ? tacticKey : techniqueKey;
+    if (target === m.key) continue;
+    const idsOnly = splitMitreValue(m.value).every((x) => lookupMitre(x.text));
+    report(
+      'YL412',
+      `Use '${target}' for MITRE ${canonical}s instead of '${m.key}'`,
+      m.keyToken.range,
+      !keys.has(target) && idsOnly ? { title: `Rename to '${target}'`, edits: [{ range: m.keyToken.range, newText: target }] } : undefined,
+    );
+  }
+
+  const tacticMeta = rule.meta.filter((m) => m.key === tacticKey);
+  const techniqueMeta = rule.meta.filter((m) => m.key === techniqueKey);
+  if (!tacticMeta.length && !techniqueMeta.length) return;
+
+  // Framework(s) the rule already uses, to resolve ambiguous names.
+  const used = new Set<MitreFramework>();
+  for (const m of [...tacticMeta, ...techniqueMeta]) {
+    for (const item of splitMitreValue(m.value)) {
+      const f = frameworkOfId(item.text);
+      if (f) used.add(f);
+    }
+  }
+  const preferred: MitreFramework = used.size === 1 ? [...used][0] : defaultFramework;
+
+  const listedTactics = new Set<string>();
+  const check = (kind: 'tactic' | 'technique', m: (typeof rule.meta)[number]) => {
+    if (!m.valueToken || m.valueToken.kind !== 'string') return;
+    const base = m.valueToken.range.start;
+    const spanRange = (s: { start: number; end: number }) => ({
+      start: { line: base.line, character: base.character + 1 + s.start },
+      end: { line: base.line, character: base.character + 1 + s.end },
+    });
+    const validShape = kind === 'tactic' ? isTacticId : isTechniqueId;
+    for (const item of splitMitreValue(m.value)) {
+      const range = spanRange(item);
+      const entry = lookupMitre(item.text);
+      if (!validShape(item.text)) {
+        if (entry) {
+          report('YL408', `${item.text} is a MITRE ${entry.kind} ID, but '${m.key}' expects ${kind} IDs`, range);
+          continue;
+        }
+        const matches = findByName(item.text, kind, frameworks);
+        if (matches.length) {
+          const pick = matches.find((x) => x.framework === preferred) ?? matches[0];
+          const alternatives = matches.filter((x) => x !== pick).map((x) => `${x.id} (${x.framework})`);
+          report(
+            'YL410',
+            `Use the ${kind} ID instead of the name: '${item.text}' is ${pick.id} (${pick.framework})${alternatives.length ? `; also ${alternatives.join(', ')}` : ''}`,
+            range,
+            { title: `Replace with ${pick.id}`, edits: [{ range, newText: pick.id }] },
+          );
+          if (kind === 'tactic') listedTactics.add(pick.id);
+        } else {
+          report('YL408', `'${item.text}' is not a MITRE ${kind} ID (expected e.g. ${kind === 'tactic' ? 'TA0006, TA0108 (ICS), AML.TA0005 (ATLAS)' : 'T1110, T1021.002, T0843 (ICS), AML.T0051 (ATLAS)'})`, range);
+        }
+        continue;
+      }
+      if (!entry) {
+        report('YL408', `Unknown MITRE ${kind} ID '${item.text}'`, range);
+        continue;
+      }
+      if (!frameworks.includes(entry.framework)) {
+        report('YL408', `${item.text} belongs to MITRE ${entry.framework}, which is not enabled in mitre.frameworks`, range);
+        continue;
+      }
+      if (entry.kind === 'tactic') listedTactics.add(entry.id);
+      if (entry.kind === 'technique') {
+        if (entry.revokedBy) {
+          const replacement = typeof entry.revokedBy === 'string' ? entry.revokedBy : undefined;
+          report('YL409', `${entry.id} (${entry.name}) has been revoked${replacement ? ` and replaced by ${replacement} (${lookupMitre(replacement)?.name ?? ''})` : ''}`, range,
+            replacement ? { title: `Replace with ${replacement}`, edits: [{ range, newText: replacement }] } : undefined);
+        } else if (entry.deprecated) {
+          report('YL409', `${entry.id} (${entry.name}) is deprecated`, range);
+        }
+      }
+    }
+  };
+  for (const m of tacticMeta) check('tactic', m);
+  for (const m of techniqueMeta) check('technique', m);
+
+  // YL411 technique/tactic consistency
+  if (listedTactics.size) {
+    for (const m of techniqueMeta) {
+      if (!m.valueToken) continue;
+      for (const item of splitMitreValue(m.value)) {
+        const e = lookupMitre(item.text);
+        if (!e || e.kind !== 'technique' || e.revokedBy || e.tactics.length === 0) continue;
+        if (!e.tactics.some((t) => listedTactics.has(t))) {
+          const base = m.valueToken.range.start;
+          report('YL411', `${e.id} (${e.name}) belongs to ${e.tactics.join(', ')}, none of which is in '${tacticKey}'`, {
+            start: { line: base.line, character: base.character + 1 + item.start },
+            end: { line: base.line, character: base.character + 1 + item.end },
+          });
+        }
       }
     }
   }

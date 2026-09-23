@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { FunctionDef } from './catalog/functions';
 import { Severity } from './linter/rules';
+import { DEFAULT_MITRE_CONFIG, MitreConfig } from './mitre';
 
 export const CONFIG_FILENAME = '.yaral-lint.json';
 
@@ -43,6 +44,8 @@ export interface LintConfig {
   /** Glob patterns the CLI skips. */
   ignore: string[];
   conventions: ConventionsConfig;
+  /** MITRE ATT&CK (Enterprise, ICS, Mobile) and ATLAS validation of tactic/technique meta. */
+  mitre: MitreConfig;
 }
 
 export const DEFAULT_CONFIG: LintConfig = {
@@ -65,9 +68,13 @@ export const DEFAULT_CONFIG: LintConfig = {
     minRules: 5,
     exclude: ['**/node_modules/**', '**/_deprecated/**'],
   },
+  mitre: DEFAULT_MITRE_CONFIG,
 };
 
-export type PartialConfig = Partial<Omit<LintConfig, 'conventions'>> & { conventions?: Partial<ConventionsConfig> };
+export type PartialConfig = Partial<Omit<LintConfig, 'conventions' | 'mitre'>> & {
+  conventions?: Partial<ConventionsConfig>;
+  mitre?: Partial<MitreConfig>;
+};
 
 export function mergeConfig(base: LintConfig, override: PartialConfig | undefined): LintConfig {
   if (!override) return base;
@@ -79,6 +86,7 @@ export function mergeConfig(base: LintConfig, override: PartialConfig | undefine
     metaPatterns: { ...base.metaPatterns, ...(override.metaPatterns ?? {}) },
     functions: [...base.functions, ...(override.functions ?? [])],
     conventions: { ...base.conventions, ...(override.conventions ?? {}) },
+    mitre: { ...base.mitre, ...(override.mitre ?? {}) },
   };
 }
 

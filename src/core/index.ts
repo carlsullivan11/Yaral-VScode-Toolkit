@@ -10,3 +10,5 @@ export * from './catalog/functions';
 export * from './catalog/keywords';
 export * from './catalog/udm';
 export * from './query';
+export * from './mitre';
+export * from './mitreCoverage';

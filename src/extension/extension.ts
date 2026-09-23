@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { CONFIG_FILENAME, conventionsReport, suggestedConfig } from '../core';
+import { buildMitreCoverage, CONFIG_FILENAME, conventionsReport, MitreFramework, mitreCoverageReport, navigatorLayer, suggestedConfig } from '../core';
 import { isYaral } from './convert';
 import { DiagnosticsManager } from './diagnostics';
 import { registerProviders } from './providers';
@@ -65,6 +65,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       const doc = await vscode.workspace.openTextDocument({ content: conventionsReport(conventions), language: 'markdown' });
       await vscode.commands.executeCommand('markdown.showPreview', doc.uri);
+    }),
+    vscode.commands.registerCommand('yaral.showMitreCoverage', async () => {
+      await index.initialize();
+      const coverage = buildMitreCoverage(index.allSummaries(), index.getConfig(undefined).config.mitre);
+      const doc = await vscode.workspace.openTextDocument({ content: mitreCoverageReport(coverage), language: 'markdown' });
+      await vscode.commands.executeCommand('markdown.showPreview', doc.uri);
+    }),
+    vscode.commands.registerCommand('yaral.exportNavigatorLayer', async () => {
+      await index.initialize();
+      const config = index.getConfig(undefined).config;
+      const choices = config.mitre.frameworks.filter((f) => f !== 'atlas');
+      const framework = (await vscode.window.showQuickPick(choices, { placeHolder: 'ATT&CK domain for the Navigator layer' })) as MitreFramework | undefined;
+      if (!framework) return;
+      const folder = vscode.workspace.workspaceFolders?.[0]?.uri;
+      const target = await vscode.window.showSaveDialog({
+        defaultUri: folder ? vscode.Uri.joinPath(folder, `yaral-${framework}-layer.json`) : undefined,
+        filters: { JSON: ['json'] },
+      });
+      if (!target) return;
+      const layer = navigatorLayer(buildMitreCoverage(index.allSummaries(), config.mitre), framework);
+      await vscode.workspace.fs.writeFile(target, Buffer.from(JSON.stringify(layer, null, 2) + '\n'));
+      vscode.window.showInformationMessage(`Wrote ATT&CK Navigator layer. Open it at https://mitre-attack.github.io/attack-navigator/`);
     }),
     vscode.commands.registerCommand('yaral.refreshConventions', async () => {
       await index.rebuild();

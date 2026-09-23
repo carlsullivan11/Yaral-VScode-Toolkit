@@ -1,0 +1,31 @@
+rule llm_prompt_injection_attempt {
+
+  meta:
+    author = "Detection Engineering"
+    description = "Detects prompts sent through the LLM gateway that contain common prompt-injection phrases"
+    rule_id = "mr_7c8d9e0f-1a2b-4c3d-9e4f-5a6b7c8d9e0f"
+    rule_name = "LLM Prompt Injection Attempt"
+    severity = "Medium"
+    priority = "Medium"
+    type = "hunt"
+    tactic = "AML.TA0005"
+    technique = "AML.T0051.000"
+
+  events:
+    $prompt.metadata.event_type = "NETWORK_HTTP"
+    $prompt.metadata.product_name = "LLM Gateway"
+    $prompt.additional.fields["prompt"] = /ignore (all )?(previous|prior) instructions|you are now in developer mode|reveal (your|the) system prompt/ nocase
+    $prompt.principal.user.userid = $user
+
+  match:
+    $user over 1h
+
+  outcome:
+    $risk_score = max(65)
+    $event_count = count_distinct($prompt.metadata.id)
+    $principal_user_userid = array_distinct($prompt.principal.user.userid)
+    $target_url = array_distinct($prompt.target.url)
+
+  condition:
+    $prompt
+}
