@@ -21,6 +21,11 @@ import {
   UDM_EVENT_TYPES,
   UDM_SOURCE_TYPES,
   variableTables,
+  allMitre,
+  lookupMitre,
+  MitreTechnique,
+  mitreMarkdown,
+  splitMitreValue,
 } from '../core';
 import { toRange } from './convert';
 import { WorkspaceIndex } from './workspaceIndex';
@@ -70,6 +75,23 @@ class HoverProvider implements vscode.HoverProvider {
     if (dotted && !dotted.text.startsWith('$')) {
       const f = functions.get(dotted.text);
       if (f) return new vscode.Hover(new vscode.MarkdownString(functionMarkdown(f)), new vscode.Range(document.positionAt(dotted.start), document.positionAt(dotted.end)));
+    }
+
+    // MITRE IDs inside tactic/technique meta values
+    if (rule && tok.kind === 'string' && sectionAt(rule, offset)?.kind === 'meta') {
+      const meta = rule.meta.find((m) => m.valueToken === tok);
+      if (meta && (meta.key === config.mitre.tacticKey || meta.key === config.mitre.techniqueKey)) {
+        const inner = offset - tok.start - 1;
+        const items = splitMitreValue(meta.value);
+        const item = items.find((x) => inner >= x.start && inner <= x.end);
+        const entries = (item ? [item] : items).map((x) => lookupMitre(x.text)).filter((e) => e !== undefined);
+        if (entries.length) {
+          const hoverRange = item
+            ? new vscode.Range(tok.range.start.line, tok.range.start.character + 1 + item.start, tok.range.start.line, tok.range.start.character + 1 + item.end)
+            : range;
+          return new vscode.Hover(new vscode.MarkdownString(entries.map(mitreMarkdown).join('\n\n---\n\n')), hoverRange);
+        }
+      }
     }
 
     // Meta keys: show workspace conventions
@@ -155,6 +177,28 @@ class CompletionProvider implements vscode.CompletionItemProvider {
     const sec = rule ? sectionAt(rule, offset) : undefined;
     const { functions, config } = this.index.getConfig(document.uri);
     const conventions = this.index.getConventions();
+
+    // MITRE tactic / technique IDs inside meta strings (comma-separated lists supported)
+    const mitreMatch = /^\s*(\w+)\s*=\s*"([^"]*)$/.exec(linePrefix);
+    if (sec?.kind === 'meta' && mitreMatch && (mitreMatch[1] === config.mitre.tacticKey || mitreMatch[1] === config.mitre.techniqueKey)) {
+      const kind = mitreMatch[1] === config.mitre.tacticKey ? 'tactic' : 'technique';
+      const partial = /[^,;|\s]*$/.exec(mitreMatch[2])![0];
+      const range = new vscode.Range(position.translate(0, -partial.length), position);
+      // Rank techniques under the rule's listed tactics first.
+      const tacticValue = rule?.meta.find((m) => m.key === config.mitre.tacticKey)?.value ?? '';
+      const ruleTactics = new Set(splitMitreValue(tacticValue).map((x) => x.text));
+      return allMitre(kind, config.mitre.frameworks)
+        .filter((e) => !(e.kind === 'technique' && (e as MitreTechnique).deprecated))
+        .map((e) => {
+          const item = new vscode.CompletionItem({ label: e.id, description: e.name, detail: ` ${e.framework === 'atlas' ? 'ATLAS' : 'ATT&CK ' + e.framework}` }, vscode.CompletionItemKind.Reference);
+          item.filterText = `${e.id} ${e.name}`;
+          item.documentation = new vscode.MarkdownString(mitreMarkdown(e));
+          item.range = range;
+          const related = e.kind === 'technique' && (e as MitreTechnique).tactics.some((t) => ruleTactics.has(t));
+          item.sortText = `${related ? 0 : 1}${e.id.padEnd(16)}`;
+          return item;
+        });
+    }
 
     // Enum values inside strings
     const enumMatch = /([\w.]+)\s*!?=\s*"([^"]*)$/.exec(linePrefix);

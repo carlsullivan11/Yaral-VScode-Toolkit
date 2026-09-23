@@ -139,10 +139,10 @@
   },
   "MITRE ATT&CK meta": {
     "prefix": "mitre",
-    "description": "MITRE ATT&CK tactic/technique meta keys",
+    "description": "MITRE ATT&CK Enterprise tactic/technique meta (IDs complete as you type)",
     "body": [
-      "tactic = \"${1:TA0000}\"",
-      "technique = \"${2:T0000}\""
+      "tactic = \"${1:TA0006}\"",
+      "technique = \"${2:T1110}\""
     ]
   },
   "Reference list exclusion": {
@@ -202,6 +202,22 @@
       " * limitations under the License.",
       " */",
       ""
+    ]
+  },
+  "MITRE ATT&CK for ICS meta": {
+    "prefix": "mitre-ics",
+    "description": "MITRE ATT&CK for ICS tactic/technique meta",
+    "body": [
+      "tactic = \"${1:TA0108}\"",
+      "technique = \"${2:T0886}\""
+    ]
+  },
+  "MITRE ATLAS meta": {
+    "prefix": "mitre-atlas",
+    "description": "MITRE ATLAS (AI systems) tactic/technique meta",
+    "body": [
+      "tactic = \"${1:AML.TA0005}\"",
+      "technique = \"${2:AML.T0051}\""
     ]
   }
 }

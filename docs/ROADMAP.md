@@ -31,59 +31,108 @@ Measured across the corpus with this toolkit's parser:
 - **Reference lists and data tables are external.** A typo in `%allowlist_name` fails only at deploy time.
 - **Testing is manual.** Nothing checks locally that a rule matches known-bad samples and skips known-good ones.
 
-## Delivered in v0.1
+## Decisions
+
+| Topic | Decision |
+|---|---|
+| License | MIT |
+| MITRE meta schema | `tactic` / `technique` with IDs (comma-separated for several). `mitre_attack_*` and similar keys are flagged by `YL412`, with a rename quick fix. |
+| MITRE frameworks | ATT&CK Enterprise, ATT&CK for ICS, ATT&CK Mobile and ATLAS, all enabled by default (`mitre.frameworks`). |
+
+## Delivered
+
+### v0.1
 
 - Syntax highlighting, language configuration, snippets
-- Tolerant parser + 42-rule linter with quick fixes and inline suppressions
+- Tolerant parser + linter with quick fixes and inline suppressions
 - Workspace convention learning (standard meta/outcomes, value enums, typos, duplicate rule names / IDs)
 - Hover docs, signature help, completion for functions, UDM paths, enums, variables, reference lists, meta keys/values
 - Outline, go to definition, references, rename, highlights, folding, formatter
 - `yaral-lint` CLI (text/json/sarif/github, `--fix`, `format --check`, `conventions --init`) and a GitHub Action
 
-## Roadmap
+### v0.2: MITRE frameworks (pulled forward from Stage 4)
 
-Ordered by value to a detection engineer relative to effort.
+- Bundled catalog generated from MITRE's official data: ATT&CK v19.2 (Enterprise 858, ICS 106, Mobile 176 techniques) and ATLAS 2026.09 (208 techniques), including revocations and their replacements. It is refreshed with `npm run update-mitre` and a monthly workflow that opens a PR.
+- Lint rules `YL408`–`YL412`:
+  - unknown or wrong-kind IDs, and IDs from frameworks that aren't enabled
+  - revoked/deprecated techniques, with a fix to the replacement (for example, v19 revoked T1562 → T1685)
+  - names instead of IDs, fixed to the ID using the framework the rule already uses (e.g. "Initial Access" → TA0108 in an ICS rule)
+  - techniques not under any listed tactic
+  - alternative meta keys
+- Hover on IDs (name, framework, tactics, link) and ID completion that matches by ID or name, ranking techniques under the rule's tactics first.
+- `yaral-lint mitre` coverage report for all four frameworks, and ATT&CK Navigator layer export (`--layer`, Enterprise/ICS/Mobile). Both are also available as VS Code commands.
+- `mitre`, `mitre-ics` and `mitre-atlas` snippets. The ICS and ATLAS example rules use them.
 
-### P1: Close the loop with Google SecOps
+## Staged plan
+
+```
+Stage 0 ──► Stage 1 (SecOps API) ──────────────────────┐
+       └──► Stage 2 (expression parser, UDM, types) ──► Stage 3 (rule tests) ──► Stage 4 (quality & insight)
+                                                           Stage 5 (LSP, queries) after Stage 2
+```
+
+Stages 1 and 2 are independent and can run in parallel. The recommended order is Stage 0, then Stage 1 steps 1–2 (setup and verify rule), then the Stage 2 parser.
+
+### Stage 0: Make it trustworthy (about 1–2 weeks)
+
+| Work | Why |
+|---|---|
+| Automated tests inside real VS Code (`@vscode/test-electron`) in CI | So far the extension has only been exercised through a mocked `vscode` API. |
+| Verify the function catalog against Google's function reference | It was written without access to the docs. Add a check that fails when the catalog and docs disagree. |
+| CI and the GitHub Action green on GitHub | Neither has run on GitHub yet. |
+| Publish: VS Code Marketplace, Open VSX, npm (`npx yaral-lint`) | MIT license is in place. |
+| Pre-commit hook (`.pre-commit-hooks.yaml`) | Linting before each commit. |
+| Performance test on about 5,000 rules | Keep indexing and re-linting fast as repos grow. |
+
+**Done when:** the extension is published, CI is green, and the catalog is verified.
+
+### Stage 1: Connect to Google SecOps
+
+1. **Setup:** a `secops` block in `.yaral-lint.json` (project, region, instance). Auth uses `gcloud` Application Default Credentials locally and Workload Identity Federation in CI.
+2. **Verify rule:** `verifyRuleText` errors shown as diagnostics, on demand or on save, and as `yaral-lint verify` in CI. Results are cached by rule-text hash, and 429 responses are retried.
+3. **Test rule / retrohunt:** run the rule over a time range and show detections, matched events and outcomes in a panel, with a diff against the deployed version.
+4. **Pull / diff / deploy:** compatible with `content_manager`'s `rule_config.yaml` layout.
+5. **Reference lists and data tables:** validate `%names` locally or against the tenant, and show contents on hover.
+
+**Risk:** the SecOps API is `v1alpha`, so all calls sit behind one client module.
+
+### Stage 2: Expression parser and deeper static analysis
+
+1. **Expression parser:** a real syntax tree for `events:`, `condition:` and `outcome:`. Existing checks migrate onto it, and the 917-rule Google corpus becomes a regression test.
+2. **Full UDM schema:** field existence, types, enum values (`USER_LOGON` would be flagged), and repeated fields that need `any`/`all`.
+3. **Type checking:** function argument types, string vs. number comparisons, timestamps.
+4. **Condition analysis:** conditions that can never fire, counts without `match:`, outcome variables in the condition without a window.
+
+### Stage 3: Rule unit tests (needs Stage 2)
+
+- `<rule>.test.yaml` next to each rule, with sample UDM events and expected match / no-match.
+- A local evaluator: single-event rules first, then match windows and joins.
+- `yaral-lint test` in CI, plus VS Code Testing panel integration.
+- Import real events from SecOps (Stage 1) as test fixtures.
+
+**Done when:** breaking a known-bad sample fails CI without SecOps credentials.
+
+### Stage 4: Content quality and insight
 
 | Feature | Notes |
 |---|---|
-| **Verify rule** command + CI step | Call `verifyRuleText` and map compiler errors to diagnostics. Auth via `gcloud` Application Default Credentials locally and Workload Identity Federation in CI. Region-aware base URL (`{region}-chronicle.googleapis.com`). |
-| **Test rule / retrohunt from the editor** | Run the current rule over a time range. Show detections, matched events and outcome values in a webview, and diff the results against the deployed version. |
-| **Pull / deploy / diff** | Compare local rules with deployed versions and state (enabled, alerting, run frequency), compatible with `content_manager`'s `rule_config.yaml`, then deploy on merge. |
-| **Reference lists & data tables** | Validate `%name` / `%table.column` against local `reference_lists/` and `data_tables/` folders (content_manager layout) or the tenant. Hover shows entries, and data-table columns get completions. |
+| **MITRE: data-source-aware coverage** | Cross-reference techniques with the log types a rule uses. Show which covered techniques depend on log sources you don't ingest. |
+| **MITRE: detection gaps** | Highlight high-prevalence techniques with no rule, per framework. For ICS, filter by the asset types in scope. |
+| **MITRE: ATLAS Navigator layers** | Add layer export once the ATLAS Navigator's domain/version format is confirmed. ATT&CK layers already ship. |
+| **MITRE: other frameworks** | Candidates: MITRE D3FEND (defensive mapping), the CAPEC → ATT&CK bridge, and cloud-specific views (ATT&CK Enterprise's IaaS/SaaS/Identity Provider platforms as filters). The data pipeline already handles multiple frameworks, so adding one means another converter in `scripts/update-mitre.mjs`. |
+| **Version checks in CI** | Flag logic changes without a `version` meta bump, and generate a changelog. |
+| **CodeLens above each rule** | Severity, risk score, deployed state, detections in the last 7 days (Stage 1). |
+| **Coverage dashboard** | Webview by tactic, log type and severity, with gaps against ingested log types. |
+| **Sigma import** | Via pySigma's SecOps backend, then linted (e.g. RE2 incompatibilities). |
 
-### P2: Deeper static analysis
+### Stage 5: Platform
 
-| Feature | Notes |
-|---|---|
-| **Full UDM schema** | Generate field catalogs from Google's UDM definitions to flag unknown fields (`$e.principal.hostnmae`) and to show each field's type and repeated/enum status on hover. |
-| **Type checking** | Types for function arguments and comparisons: string vs int, timestamps, repeated fields that need `any`/`all`, enum values (`metadata.event_type = "USER_LOGON"` would be flagged). |
-| **Condition analysis** | Report conditions that can never fire (`#e > 0 and !$e`), missing `match:` when the condition counts events, and outcome variables in the condition that need a match window. |
-| **Cost / performance hints** | Unanchored regexes on high-volume fields, missing `log_type` filters, very large match windows, entity-graph joins without `source_type`. |
-| **Search & dashboard queries** | Support UDM search / statistical search syntax (YARA-L query fragments without a `rule {}` wrapper, as in the corpus's `dashboards/` folder). |
+- **Language server** wrapping the editor-agnostic `src/core` (Neovim, JetBrains, Zed, Emacs).
+- **UDM search / dashboard queries** without a `rule {}` wrapper.
+- **Semantic highlighting** by variable role.
 
-### P3: Testing & content quality
+## Open questions
 
-| Feature | Notes |
-|---|---|
-| **Rule unit tests** | `*.test.yaml` next to each rule with sample UDM events and expected match / no-match, plus a local evaluator for single-event rules (and simple multi-event ones). Run in CI without SecOps. |
-| **MITRE ATT&CK tooling** | Validate tactic/technique IDs against ATT&CK STIX data, show names on hover, complete IDs, and export an ATT&CK Navigator coverage layer from the repo. |
-| **Rule versioning checks** | In CI, flag rules whose logic changed without a `version` meta bump (git-diff aware). Generate a changelog. |
-| **Coverage dashboard** | Webview of rules by severity, tactic, log type and data source, with gaps against the log types actually ingested. |
-| **Sigma import** | Convert Sigma to YARA-L through pySigma's SecOps backend, then run this linter on the output (for example, RE2 incompatibilities). |
-
-### P4: Platform
-
-| Feature | Notes |
-|---|---|
-| **Language Server (LSP)** | `src/core` is already editor-agnostic, so wrapping it in an LSP server would support Neovim, JetBrains, Zed and Emacs. |
-| **npm-published CLI & pre-commit hook** | `npx yaral-lint` and a first-class `.pre-commit-hooks.yaml`. |
-| **Semantic highlighting** | Distinguish event vs. placeholder vs. outcome variables by role rather than by pattern. |
-| **VS Code Marketplace / Open VSX release** | Automated publishing from tagged releases. |
-
-## Open questions for the team
-
-- Which meta schema is canonical: `tactic`/`technique` or `mitre_attack_*`? The linter can enforce either once chosen (`requiredMeta`, `metaPatterns`).
-- Should `YL504` (severity↔risk score) be a warning for your team, or stay informational?
-- Which SecOps region(s) and auth method should the API integration support first?
+- Which SecOps region(s) and auth method should Stage 1 support first? Is a test tenant available?
+- Should `YL504` (severity↔risk score) and `YL411` (technique/tactic mismatch) be warnings for your team, or stay informational?
+- Do you use Google's `content_manager` layout? If so, Stage 1 should read and write its files.

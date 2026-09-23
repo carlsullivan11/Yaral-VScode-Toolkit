@@ -172,6 +172,15 @@ export class WorkspaceIndex implements vscode.Disposable {
     return { ...entry, functions: buildFunctionIndex(entry.config.functions) };
   }
 
+  /** Summaries of every indexed rule (respecting convention excludes). */
+  allSummaries(): RuleSummary[] {
+    const cfg = this.getConfig(undefined).config;
+    const exclude = [...cfg.conventions.exclude, ...vscode.workspace.getConfiguration('yaral').get<string[]>('conventions.exclude', [])];
+    const out: RuleSummary[] = [];
+    for (const [file, s] of this.summaries) if (!matchesAnyGlob(file, exclude)) out.push(...s);
+    return out;
+  }
+
   ruleCount(): number {
     let n = 0;
     for (const s of this.summaries.values()) n += s.length;

@@ -1,15 +1,42 @@
 {
-  "requiredMeta": ["author", "description", "rule_id", "severity", "priority"],
+  "requiredMeta": [
+    "author",
+    "description",
+    "rule_id",
+    "severity",
+    "priority",
+    "tactic",
+    "technique"
+  ],
   "metaPatterns": {
-    "rule_id": "^mr_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    "rule_id": "^mr_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    "technique": "^((AML\\.)?T\\d{4}(\\.\\d{3})?)(, ?(AML\\.)?T\\d{4}(\\.\\d{3})?)*$"
   },
-  "requiredOutcomes": ["risk_score"],
+  "requiredOutcomes": [
+    "risk_score"
+  ],
   "rules": {
     "YL208": "hint"
   },
-  "ignore": ["**/node_modules/**", "**/test/fixtures/**"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/test/fixtures/**"
+  ],
   "conventions": {
     "minRules": 3,
-    "exclude": ["**/node_modules/**", "**/test/fixtures/**"]
+    "exclude": [
+      "**/node_modules/**",
+      "**/test/fixtures/**"
+    ]
+  },
+  "mitre": {
+    "frameworks": [
+      "enterprise",
+      "ics",
+      "mobile",
+      "atlas"
+    ],
+    "tacticKey": "tactic",
+    "techniqueKey": "technique"
   }
 }

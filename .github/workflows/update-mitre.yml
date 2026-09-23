@@ -1,0 +1,29 @@
+name: Update MITRE data
+
+on:
+  schedule:
+    - cron: "0 6 1 * *" # monthly; ATLAS publishes monthly, ATT&CK roughly twice a year
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run update-mitre
+      - run: npm test
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/update-mitre-data
+          title: "chore: update MITRE ATT&CK / ATLAS data"
+          commit-message: "chore: update MITRE ATT&CK / ATLAS data"
+          body: Automated refresh of `src/core/catalog/mitre-data.json` from MITRE's official releases (`npm run update-mitre`). Newly revoked techniques will surface as YL409 findings in rule repositories.

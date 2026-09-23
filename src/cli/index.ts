@@ -12,6 +12,10 @@ import * as path from 'path';
 import {
   applyFixes,
   buildConventions,
+  buildMitreCoverage,
+  mitreCoverageReport,
+  MitreFramework,
+  navigatorLayer,
   buildFunctionIndex,
   CONFIG_FILENAME,
   Conventions,
@@ -29,7 +33,7 @@ import {
   summarizeText,
 } from '../core';
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 
 interface Args {
   command: string;
@@ -38,11 +42,11 @@ interface Args {
 }
 
 function parseArgs(argv: string[]): Args {
-  const commands = new Set(['lint', 'format', 'conventions', 'rules', 'help']);
+  const commands = new Set(['lint', 'format', 'conventions', 'mitre', 'rules', 'help']);
   const flags: Record<string, string | boolean> = {};
   const paths: string[] = [];
   let command = 'lint';
-  const valued = new Set(['config', 'format', 'max-warnings', 'output', 'rule', 'threshold']);
+  const valued = new Set(['config', 'format', 'max-warnings', 'output', 'rule', 'threshold', 'layer', 'framework']);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith('--')) {
@@ -64,6 +68,7 @@ Usage:
   yaral-lint [lint] [paths...] [options]    Lint .yaral files (default: current directory)
   yaral-lint format [paths...] [--check]    Format files in place, or verify formatting
   yaral-lint conventions [paths...]         Show meta/outcome conventions learned from rules
+  yaral-lint mitre [paths...]               MITRE ATT&CK / ATLAS coverage of the rules
   yaral-lint rules                          List all lint rules
 
 Lint options:
@@ -79,6 +84,10 @@ Conventions options:
   --json                 Output JSON statistics
   --init                 Write a ${CONFIG_FILENAME} derived from the conventions
   --threshold <0-1>      Coverage required for a key to be "standard"
+
+MITRE options:
+  --json                 Output JSON coverage
+  --layer <file>         Write an ATT&CK Navigator layer (with --framework enterprise|ics|mobile)
 
 Exit codes: 0 ok, 1 lint errors / too many warnings / unformatted files, 2 usage error.
 `;
@@ -112,6 +121,8 @@ function main(): number {
       return runFormat(inputs, config, !!args.flags.check);
     case 'conventions':
       return runConventions(inputs, config, args);
+    case 'mitre':
+      return runMitre(inputs, config, args);
     default:
       return runLint(inputs, config, configFile, args);
   }
@@ -295,6 +306,31 @@ function runConventions(inputs: string[], config: LintConfig, args: Args): numbe
     return 0;
   }
   console.log(args.flags.json ? JSON.stringify(conventions, null, 2) : conventionsReport(conventions));
+  return 0;
+}
+
+function runMitre(inputs: string[], config: LintConfig, args: Args): number {
+  const files = findRuleFiles(inputs, config.ignore);
+  const summaries = files.flatMap((f) => summarizeText(fs.readFileSync(f, 'utf8'), f));
+  const coverage = buildMitreCoverage(summaries, config.mitre);
+  if (typeof args.flags.layer === 'string') {
+    const framework = (typeof args.flags.framework === 'string' ? args.flags.framework : 'enterprise') as MitreFramework;
+    try {
+      fs.writeFileSync(args.flags.layer, JSON.stringify(navigatorLayer(coverage, framework), null, 2) + '\n');
+    } catch (e) {
+      console.error((e as Error).message);
+      return 2;
+    }
+    console.log(`Wrote ${framework} Navigator layer to ${args.flags.layer}`);
+    return 0;
+  }
+  if (args.flags.json) {
+    const plain = {
+      frameworks: coverage.frameworks.map((f) => ({ ...f, techniques: Object.fromEntries(f.techniques), tactics: Object.fromEntries(f.tactics) })),
+      unmappedRules: coverage.unmappedRules,
+    };
+    console.log(JSON.stringify(plain, null, 2));
+  } else console.log(mitreCoverageReport(coverage));
   return 0;
 }
 

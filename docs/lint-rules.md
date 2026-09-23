@@ -73,6 +73,11 @@ Severities: `error`, `warning`, `info`, `hint`, `off`. The CLI exits non-zero on
 | <a id="yl405"></a>YL405 | `duplicate-meta` | warning | A meta key is defined more than once. |
 | <a id="yl406"></a>YL406 | `meta-key-typo` | info | A meta key is not used elsewhere in the workspace but is close to a common key (possible typo). |
 | <a id="yl407"></a>YL407 | `duplicate-rule-identity` | error | rule name or meta rule_id duplicates another rule in the workspace. |
+| <a id="yl408"></a>YL408 | `mitre-unknown-id` | warning | tactic/technique value is not a valid ID in the enabled MITRE frameworks (ATT&CK Enterprise, ICS, Mobile, ATLAS). |
+| <a id="yl409"></a>YL409 | `mitre-deprecated` | warning | MITRE technique is revoked or deprecated; revoked techniques link to their replacement. |
+| <a id="yl410"></a>YL410 | `mitre-name-instead-of-id` | warning | Use MITRE IDs (TA0006, T1110, AML.T0051) rather than names in tactic/technique meta. |
+| <a id="yl411"></a>YL411 | `mitre-tactic-mismatch` | info | None of the technique's tactics are listed in the rule's tactic meta. |
+| <a id="yl412"></a>YL412 | `mitre-meta-key` | info | Use the configured MITRE meta keys (tactic/technique by default) instead of alternatives such as mitre_attack_tactic. |
 
 ## Outcomes
 
