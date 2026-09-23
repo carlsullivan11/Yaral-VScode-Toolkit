@@ -1,0 +1,154 @@
+{
+  "name": "yaral-toolkit",
+  "displayName": "YARA-L Toolkit",
+  "description": "YARA-L 2.0 language support for Google SecOps detection engineering: syntax highlighting, linting, function docs, workspace convention checks, formatting and a CI/CD linter CLI.",
+  "version": "0.1.0",
+  "publisher": "carlsullivan11",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/carlsullivan11/Yaral-VScode-Toolkit.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0",
+    "node": ">=18"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Formatters",
+    "Snippets"
+  ],
+  "keywords": [
+    "yara-l",
+    "yaral",
+    "chronicle",
+    "google secops",
+    "detection engineering",
+    "siem"
+  ],
+  "main": "./dist/extension.js",
+  "bin": {
+    "yaral-lint": "./dist/cli.js"
+  },
+  "activationEvents": [
+    "workspaceContains:**/*.yaral"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "yaral",
+        "aliases": [
+          "YARA-L",
+          "yaral",
+          "YARA-L 2.0"
+        ],
+        "extensions": [
+          ".yaral",
+          ".yara-l",
+          ".yl2"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "yaral",
+        "scopeName": "source.yaral",
+        "path": "./syntaxes/yaral.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "yaral",
+        "path": "./snippets/yaral.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "yaral.showConventions",
+        "title": "YARA-L: Show Workspace Conventions Report"
+      },
+      {
+        "command": "yaral.refreshConventions",
+        "title": "YARA-L: Re-index Workspace Rules"
+      },
+      {
+        "command": "yaral.lintWorkspace",
+        "title": "YARA-L: Lint All Rules in Workspace"
+      },
+      {
+        "command": "yaral.insertRuleId",
+        "title": "YARA-L: Insert New rule_id (mr_<uuid>)"
+      },
+      {
+        "command": "yaral.createConfig",
+        "title": "YARA-L: Create .yaral-lint.json From Workspace Conventions"
+      }
+    ],
+    "configuration": {
+      "title": "YARA-L Toolkit",
+      "properties": {
+        "yaral.lint.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable YARA-L diagnostics."
+        },
+        "yaral.lint.rules": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "Override lint rule severities, e.g. `{ \"YL301\": \"off\", \"YL101\": \"error\" }`. Values: `error`, `warning`, `info`, `hint`, `off`. Settings in `.yaral-lint.json` take precedence."
+        },
+        "yaral.conventions.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Learn standard meta keys and outcome variables from other YARA-L rules in the workspace."
+        },
+        "yaral.conventions.threshold": {
+          "type": "number",
+          "default": 0.8,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Fraction of workspace rules that must contain a meta key / outcome variable for it to be treated as a standard."
+        },
+        "yaral.conventions.minRules": {
+          "type": "number",
+          "default": 5,
+          "description": "Minimum number of indexed rules before learned conventions are enforced."
+        },
+        "yaral.conventions.exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/node_modules/**",
+            "**/_deprecated/**"
+          ],
+          "description": "Glob patterns excluded when learning workspace conventions."
+        },
+        "yaral.format.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the YARA-L document formatter."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc -p . --noEmit",
+    "pretest": "tsc -p tsconfig.test.json && node esbuild.mjs",
+    "test": "node --test out/test/*.test.js",
+    "lint:examples": "node dist/cli.js examples/rules",
+    "package": "npm run build && npx @vscode/vsce package",
+    "vscode:prepublish": "npm run build",
+    "docs": "tsc -p tsconfig.test.json && node scripts/gen-lint-docs.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3"
+  }
+}

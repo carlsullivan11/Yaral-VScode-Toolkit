@@ -1,0 +1,37 @@
+rule failed_logins_then_success {
+
+  meta:
+    author = "Detection Engineering"
+    description = "Detects a successful login following repeated failed logins for the same user"
+    rule_id = "mr_9e1b2c3d-4f5a-4b6c-8d7e-0f1a2b3c4d5e"
+    rule_name = "Failed Logins Followed By Success"
+    severity = "High"
+    priority = "High"
+    type = "alert"
+    tactic = "TA0006"
+    technique = "T1110"
+
+  events:
+    $failed.metadata.event_type = "USER_LOGIN"
+    $failed.security_result.action = "BLOCK"
+    $failed.target.user.userid = $user
+
+    $success.metadata.event_type = "USER_LOGIN"
+    $success.security_result.action = "ALLOW"
+    $success.target.user.userid = $user
+
+    $failed.metadata.event_timestamp.seconds < $success.metadata.event_timestamp.seconds
+
+  match:
+    $user over 30m
+
+  outcome:
+    $risk_score = max(85)
+    $failed_login_threshold = max(5)
+    $event_count = count_distinct($failed.metadata.id)
+    $principal_ip = array_distinct($failed.principal.ip)
+    $target_user_userid = array_distinct($success.target.user.userid)
+
+  condition:
+    #failed >= 5 and $success
+}

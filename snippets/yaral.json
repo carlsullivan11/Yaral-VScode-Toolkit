@@ -1,0 +1,207 @@
+{
+  "Single-event rule": {
+    "prefix": "rule",
+    "description": "Single-event YARA-L rule with meta, events, outcome and condition",
+    "body": [
+      "rule ${1:${TM_FILENAME_BASE}} {",
+      "",
+      "  meta:",
+      "    author = \"${2:Detection Engineering}\"",
+      "    description = \"${3:Detects ...}\"",
+      "    rule_id = \"mr_${UUID}\"",
+      "    rule_name = \"${4:Human friendly rule name}\"",
+      "    severity = \"${5|Info,Low,Medium,High,Critical|}\"",
+      "    priority = \"${6|Info,Low,Medium,High,Critical|}\"",
+      "    type = \"${7|alert,hunt|}\"",
+      "    tactic = \"${8:TA0000}\"",
+      "    technique = \"${9:T0000}\"",
+      "",
+      "  events:",
+      "    \\$${10:process}.metadata.event_type = \"${11:PROCESS_LAUNCH}\"",
+      "    $0",
+      "",
+      "  outcome:",
+      "    \\$risk_score = max(${12:35})",
+      "    \\$event_count = count_distinct(\\$${10}.metadata.id)",
+      "    \\$principal_hostname = array_distinct(\\$${10}.principal.hostname)",
+      "    \\$principal_user_userid = array_distinct(\\$${10}.principal.user.userid)",
+      "",
+      "  condition:",
+      "    \\$${10}",
+      "}"
+    ]
+  },
+  "Multi-event rule": {
+    "prefix": "rule-multi",
+    "description": "Multi-event YARA-L rule with a match window and threshold",
+    "body": [
+      "rule ${1:${TM_FILENAME_BASE}} {",
+      "",
+      "  meta:",
+      "    author = \"${2:Detection Engineering}\"",
+      "    description = \"${3:Detects ...}\"",
+      "    rule_id = \"mr_${UUID}\"",
+      "    rule_name = \"${4:Human friendly rule name}\"",
+      "    severity = \"${5|Info,Low,Medium,High,Critical|}\"",
+      "    priority = \"${6|Info,Low,Medium,High,Critical|}\"",
+      "    type = \"${7|alert,hunt|}\"",
+      "",
+      "  events:",
+      "    \\$${8:login}.metadata.event_type = \"${9:USER_LOGIN}\"",
+      "    \\$${8}.security_result.action = \"${10:BLOCK}\"",
+      "    \\$${8}.target.user.userid = \\$${11:user}",
+      "",
+      "  match:",
+      "    \\$${11} over ${12:10m}",
+      "",
+      "  outcome:",
+      "    \\$risk_score = max(${13:35})",
+      "    \\$${14:failed_login}_threshold = max(${15:10})",
+      "    \\$event_count = count_distinct(\\$${8}.metadata.id)",
+      "    \\$principal_ip = array_distinct(\\$${8}.principal.ip)",
+      "",
+      "  condition:",
+      "    #${8} >= ${15}",
+      "}"
+    ]
+  },
+  "Event correlation rule": {
+    "prefix": "rule-sequence",
+    "description": "Two events joined on a placeholder, the first before the second",
+    "body": [
+      "rule ${1:${TM_FILENAME_BASE}} {",
+      "",
+      "  meta:",
+      "    author = \"${2:Detection Engineering}\"",
+      "    description = \"${3:Detects ...}\"",
+      "    rule_id = \"mr_${UUID}\"",
+      "    severity = \"${4|Info,Low,Medium,High,Critical|}\"",
+      "",
+      "  events:",
+      "    \\$${5:first}.metadata.event_type = \"${6:USER_LOGIN}\"",
+      "    \\$${5}.principal.hostname = \\$${7:hostname}",
+      "",
+      "    \\$${8:second}.metadata.event_type = \"${9:PROCESS_LAUNCH}\"",
+      "    \\$${8}.principal.hostname = \\$${7}",
+      "",
+      "    \\$${5}.metadata.event_timestamp.seconds < \\$${8}.metadata.event_timestamp.seconds",
+      "",
+      "  match:",
+      "    \\$${7} over ${10:1h}",
+      "",
+      "  outcome:",
+      "    \\$risk_score = max(${11:65})",
+      "",
+      "  condition:",
+      "    \\$${5} and \\$${8}",
+      "}"
+    ]
+  },
+  "Entity graph join": {
+    "prefix": "entity-join",
+    "description": "Join a UDM event with the entity graph (context enrichment)",
+    "body": [
+      "\\$${1:e}.principal.user.userid = \\$${2:user}",
+      "\\$${3:user_entity}.graph.metadata.entity_type = \"USER\"",
+      "\\$${3}.graph.metadata.source_type = \"ENTITY_CONTEXT\"",
+      "\\$${3}.graph.entity.user.userid = \\$${2}"
+    ]
+  },
+  "Outcome risk score": {
+    "prefix": "risk",
+    "description": "$risk_score outcome variable",
+    "body": [
+      "\\$risk_score = max(${1|10,35,65,85,95|})"
+    ]
+  },
+  "Dynamic risk score": {
+    "prefix": "risk-if",
+    "description": "$risk_score built from conditional increments",
+    "body": [
+      "\\$risk_score = max(${1:35}",
+      "  + if(${2:condition}, ${3:20})",
+      ")"
+    ]
+  },
+  "Array distinct outcome": {
+    "prefix": "ad",
+    "description": "array_distinct outcome variable",
+    "body": [
+      "\\$${1:principal_hostname} = array_distinct(\\$${2:e}.${3:principal.hostname})"
+    ]
+  },
+  "Event count outcome": {
+    "prefix": "event-count",
+    "description": "Standard $event_count outcome",
+    "body": [
+      "\\$event_count = count_distinct(\\$${1:e}.metadata.id)"
+    ]
+  },
+  "MITRE ATT&CK meta": {
+    "prefix": "mitre",
+    "description": "MITRE ATT&CK tactic/technique meta keys",
+    "body": [
+      "tactic = \"${1:TA0000}\"",
+      "technique = \"${2:T0000}\""
+    ]
+  },
+  "Reference list exclusion": {
+    "prefix": "not-in-list",
+    "description": "Exclude values in a reference list",
+    "body": [
+      "not \\$${1:e}.${2:principal.hostname} in %${3:allowlist}"
+    ]
+  },
+  "Regex match": {
+    "prefix": "re",
+    "description": "Case-insensitive regex predicate",
+    "body": [
+      "\\$${1:e}.${2:target.process.command_line} = /${3:pattern}/ nocase"
+    ]
+  },
+  "Match window": {
+    "prefix": "match",
+    "description": "match: section",
+    "body": [
+      "match:",
+      "  \\$${1:user} over ${2:10m}"
+    ]
+  },
+  "Options": {
+    "prefix": "options",
+    "description": "options: section",
+    "body": [
+      "options:",
+      "  allow_zero_values = ${1|true,false|}"
+    ]
+  },
+  "Suppress lint rule": {
+    "prefix": "yaral-lint-disable",
+    "description": "Suppress a lint rule on the next line",
+    "body": [
+      "// yaral-lint-disable-next-line ${1:YL000}"
+    ]
+  },
+  "License header": {
+    "prefix": "license",
+    "description": "Apache 2.0 license header (Google SecOps community style)",
+    "body": [
+      "/*",
+      " * Copyright ${CURRENT_YEAR} ${1:Your Organization}",
+      " *",
+      " * Licensed under the Apache License, Version 2.0 (the \"License\");",
+      " * you may not use this file except in compliance with the License.",
+      " * You may obtain a copy of the License at",
+      " *",
+      " *     https://www.apache.org/licenses/LICENSE-2.0",
+      " *",
+      " * Unless required by applicable law or agreed to in writing, software",
+      " * distributed under the License is distributed on an \"AS IS\" BASIS,",
+      " * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.",
+      " * See the License for the specific language governing permissions and",
+      " * limitations under the License.",
+      " */",
+      ""
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "requiredMeta": ["author", "description", "rule_id", "severity", "priority"],
+  "metaPatterns": {
+    "rule_id": "^mr_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+  },
+  "requiredOutcomes": ["risk_score"],
+  "rules": {
+    "YL208": "hint"
+  },
+  "ignore": ["**/node_modules/**", "**/test/fixtures/**"],
+  "conventions": {
+    "minRules": 3,
+    "exclude": ["**/node_modules/**", "**/test/fixtures/**"]
+  }
+}

@@ -1,0 +1,54 @@
+name: YARA-L Lint
+description: Lint (and optionally format-check) YARA-L 2.0 rules for Google SecOps with yaral-lint.
+branding:
+  icon: shield
+  color: blue
+inputs:
+  paths:
+    description: Space-separated files or directories to lint.
+    default: "."
+  config:
+    description: Path to .yaral-lint.json (defaults to the nearest one).
+    default: ""
+  max-warnings:
+    description: Fail when there are more warnings than this. Empty means unlimited.
+    default: ""
+  format-check:
+    description: Also fail when files are not formatted.
+    default: "false"
+  sarif-file:
+    description: If set, also write a SARIF report to this path (for github/codeql-action/upload-sarif).
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Build yaral-lint
+      shell: bash
+      run: |
+        cd "$GITHUB_ACTION_PATH"
+        npm ci --no-audit --no-fund --ignore-scripts
+        npm run build
+    - name: Lint rules
+      shell: bash
+      env:
+        INPUT_PATHS: ${{ inputs.paths }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_MAX_WARNINGS: ${{ inputs.max-warnings }}
+        INPUT_SARIF: ${{ inputs.sarif-file }}
+        INPUT_FORMAT_CHECK: ${{ inputs.format-check }}
+      run: |
+        CLI="node $GITHUB_ACTION_PATH/dist/cli.js"
+        ARGS=()
+        [ -n "$INPUT_CONFIG" ] && ARGS+=(--config "$INPUT_CONFIG")
+        [ -n "$INPUT_MAX_WARNINGS" ] && ARGS+=(--max-warnings "$INPUT_MAX_WARNINGS")
+        read -r -a PATHS <<< "$INPUT_PATHS"
+        status=0
+        if [ -n "$INPUT_SARIF" ]; then
+          $CLI "${PATHS[@]}" "${ARGS[@]}" --format sarif --output "$INPUT_SARIF" || true
+        fi
+        $CLI "${PATHS[@]}" "${ARGS[@]}" --format github || status=$?
+        $CLI "${PATHS[@]}" "${ARGS[@]}" --format text >> "$GITHUB_STEP_SUMMARY" || true
+        if [ "$INPUT_FORMAT_CHECK" = "true" ]; then
+          $CLI format --check "${PATHS[@]}" || status=1
+        fi
+        exit $status

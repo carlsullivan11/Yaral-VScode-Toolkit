@@ -1,0 +1,269 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "YARA-L",
+  "scopeName": "source.yaral",
+  "fileTypes": [
+    "yaral",
+    "yara-l",
+    "yl2"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#rule-declaration"
+    },
+    {
+      "include": "#meta-section"
+    },
+    {
+      "include": "#section-header"
+    },
+    {
+      "include": "#options-assignment"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#regex"
+    },
+    {
+      "include": "#functions"
+    },
+    {
+      "include": "#variables"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#operators"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.yaral",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.yaral",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.yaral"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.comment.yaral"
+            }
+          }
+        }
+      ]
+    },
+    "rule-declaration": {
+      "match": "\\b(rule)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": {
+          "name": "storage.type.rule.yaral"
+        },
+        "2": {
+          "name": "entity.name.type.rule.yaral"
+        }
+      }
+    },
+    "section-header": {
+      "match": "^\\s*(meta|events|match|outcome|condition|options)\\s*(:)",
+      "captures": {
+        "1": {
+          "name": "keyword.control.section.yaral"
+        },
+        "2": {
+          "name": "punctuation.separator.section.yaral"
+        }
+      }
+    },
+    "meta-section": {
+      "begin": "^\\s*(meta)\\s*(:)",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.section.yaral"
+        },
+        "2": {
+          "name": "punctuation.separator.section.yaral"
+        }
+      },
+      "end": "(?=^\\s*(?:events|match|outcome|condition|options)\\s*:|^\\s*\\})",
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "match": "^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(=)",
+          "captures": {
+            "1": {
+              "name": "variable.other.property.meta.yaral"
+            },
+            "2": {
+              "name": "keyword.operator.assignment.yaral"
+            }
+          }
+        },
+        {
+          "include": "#strings"
+        },
+        {
+          "include": "#constants"
+        }
+      ]
+    },
+    "options-assignment": {
+      "match": "^\\s*(allow_zero_values|suppression_window)\\s*(=)",
+      "captures": {
+        "1": {
+          "name": "variable.other.property.option.yaral"
+        },
+        "2": {
+          "name": "keyword.operator.assignment.yaral"
+        }
+      }
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.yaral",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.yaral",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.other.raw.yaral",
+          "begin": "`",
+          "end": "`"
+        }
+      ]
+    },
+    "regex": {
+      "name": "string.regexp.yaral",
+      "match": "(?:(?<=[=(,\\[])|(?<=[=(,\\[]\\s)|(?<=[=(,\\[]\\s\\s)|(?<=\\b(?:and|AND|not|NOT|or|OR|in|IN)\\s)|(?<=\\bregex\\s))(/)((?:\\\\.|[^/\\\\\\n])+)(/)",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.string.begin.regexp.yaral"
+        },
+        "3": {
+          "name": "punctuation.definition.string.end.regexp.yaral"
+        }
+      }
+    },
+    "functions": {
+      "patterns": [
+        {
+          "match": "\\b([a-z_]+)(\\.)([a-z_][a-z0-9_]*)(?=\\s*\\()",
+          "captures": {
+            "1": {
+              "name": "support.class.namespace.yaral"
+            },
+            "2": {
+              "name": "punctuation.accessor.yaral"
+            },
+            "3": {
+              "name": "support.function.yaral"
+            }
+          }
+        },
+        {
+          "match": "\\b(array_distinct|array|count_distinct|count|max|min|sum|avg|stddev|earliest|latest|if|group)(?=\\s*\\()",
+          "captures": {
+            "1": {
+              "name": "support.function.builtin.yaral"
+            }
+          }
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "match": "(\\$[A-Za-z_][A-Za-z0-9_]*)((?:\\.[A-Za-z_][A-Za-z0-9_]*)+)",
+          "captures": {
+            "1": {
+              "name": "variable.other.event.yaral"
+            },
+            "2": {
+              "name": "variable.other.property.udm.yaral"
+            }
+          }
+        },
+        {
+          "name": "variable.other.placeholder.yaral",
+          "match": "\\$[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "name": "variable.other.count.yaral",
+          "match": "#[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "name": "variable.other.constant.reference-list.yaral",
+          "match": "%[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)?"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.operator.logical.yaral",
+          "match": "(?i)\\b(and|or|not)\\b"
+        },
+        {
+          "name": "keyword.other.yaral",
+          "match": "(?i)\\b(in|nocase|regex|cidr|any|all|over|before|after|every|by)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.yaral",
+          "match": "\\b(true|false|null)\\b"
+        },
+        {
+          "name": "constant.numeric.duration.yaral",
+          "match": "\\b\\d+[smhd]\\b"
+        },
+        {
+          "name": "constant.numeric.yaral",
+          "match": "\\b\\d+(?:\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.comparison.yaral",
+          "match": "!=|<=|>=|=|<|>"
+        },
+        {
+          "name": "keyword.operator.arithmetic.yaral",
+          "match": "[+\\-*/]"
+        },
+        {
+          "name": "keyword.operator.logical.yaral",
+          "match": "!"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,33 @@
+rule encoded_powershell_execution {
+
+  meta:
+    author = "Detection Engineering"
+    description = "Detects PowerShell launched with an encoded command line"
+    rule_id = "mr_4c7f6a0e-2d8b-4b8e-9f51-2a7c1d3e5b90"
+    rule_name = "Encoded PowerShell Execution"
+    severity = "Medium"
+    priority = "Medium"
+    type = "alert"
+    tactic = "TA0002"
+    technique = "T1059.001"
+
+  events:
+    $process.metadata.event_type = "PROCESS_LAUNCH"
+    $process.target.process.file.full_path = /\\powershell(_ise)?\.exe$/ nocase
+    re.regex($process.target.process.command_line, `(?i)\s-(e|en|enc|enco|encodedcommand)\s`)
+    not $process.principal.hostname in %powershell_admin_hosts
+    $process.principal.hostname = $hostname
+
+  match:
+    $hostname over 5m
+
+  outcome:
+    $risk_score = max(65)
+    $event_count = count_distinct($process.metadata.id)
+    $principal_hostname = array_distinct($process.principal.hostname)
+    $principal_user_userid = array_distinct($process.principal.user.userid)
+    $target_process_command_line = array_distinct($process.target.process.command_line)
+
+  condition:
+    $process
+}
