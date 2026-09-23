@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Release workflow: tag `vX.Y.Z` to test, package and publish to the VS Code Marketplace and Open VSX, with a GitHub release that carries the `.vsix` ([docs/releasing.md](docs/releasing.md))
+- `yaral-lint --version` now reads the version from `package.json`
+- CI runs on Node 22 and 24 (Node 20 is end-of-life)
+
 ## 0.2.0
 
 - MIT license

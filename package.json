@@ -152,7 +152,7 @@
     "pretest": "tsc -p tsconfig.test.json && node esbuild.mjs",
     "test": "node --test out/test/*.test.js",
     "lint:examples": "node dist/cli.js examples/rules",
-    "package": "npm run build && npx @vscode/vsce package",
+    "package": "npm run build && vsce package --no-dependencies",
     "vscode:prepublish": "npm run build",
     "docs": "tsc -p tsconfig.test.json && node scripts/gen-lint-docs.js",
     "update-mitre": "node scripts/update-mitre.mjs"
@@ -161,8 +161,10 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.20.4",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.28.2",
     "js-yaml": "^4.3.2",
+    "ovsx": "^1.2.0",
     "typescript": "^5.9.3"
   },
   "license": "MIT"

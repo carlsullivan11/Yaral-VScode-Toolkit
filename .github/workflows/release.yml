@@ -1,0 +1,98 @@
+name: Release
+
+# Publishes the extension when a version tag is pushed:
+#
+#   npm version patch        # or minor / major; bumps package.json and creates tag vX.Y.Z
+#   git push --follow-tags
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   VSCE_PAT  Azure DevOps personal access token with Marketplace → Manage scope
+#   OVSX_PAT  Open VSX access token
+# A registry whose secret is missing is skipped with a warning; the GitHub
+# release (with the .vsix attached) is always created.
+#
+# Tags with a pre-release suffix (v0.3.0-beta.1) produce a GitHub pre-release
+# only; the VS Code Marketplace doesn't accept semver pre-release versions.
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  # Manual runs build, test and package only (dry run); publishing needs a tag.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check tag matches package.json version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $VERSION. Use 'npm version <x.y.z>' to create the tag."
+            exit 1
+          fi
+          if [[ "$VERSION" == *-* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
+
+      - run: npm run typecheck
+      - run: npm test
+      - name: Lint example rules
+        run: node dist/cli.js examples/rules --max-warnings 0
+
+      - name: Package
+        run: npx vsce package --no-dependencies -o "yaral-toolkit-${{ steps.version.outputs.version }}.vsix"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yaral-toolkit-vsix
+          path: "*.vsix"
+
+      - name: Publish to VS Code Marketplace
+        if: github.ref_type == 'tag' && steps.version.outputs.prerelease == 'false'
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -z "$VSCE_PAT" ]; then echo "::warning::VSCE_PAT is not set; skipping the VS Code Marketplace."; exit 0; fi
+          npx vsce publish --packagePath "yaral-toolkit-${{ steps.version.outputs.version }}.vsix" --pat "$VSCE_PAT"
+
+      - name: Publish to Open VSX
+        if: github.ref_type == 'tag' && steps.version.outputs.prerelease == 'false'
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [ -z "$OVSX_PAT" ]; then echo "::warning::OVSX_PAT is not set; skipping Open VSX."; exit 0; fi
+          npx ovsx publish "yaral-toolkit-${{ steps.version.outputs.version }}.vsix" --pat "$OVSX_PAT"
+
+      - name: Create GitHub release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # Release notes = this version's section of CHANGELOG.md.
+          awk -v v="$VERSION" '
+            /^## / { if (found) exit; found = ($2 == v) ; next }
+            found' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then echo "See CHANGELOG.md." > notes.md; fi
+          FLAGS=()
+          if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then FLAGS+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" "yaral-toolkit-$VERSION.vsix" \
+            --title "YARA-L Toolkit $VERSION" --notes-file notes.md "${FLAGS[@]}"

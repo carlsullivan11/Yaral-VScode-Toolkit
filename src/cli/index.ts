@@ -32,8 +32,9 @@ import {
   suggestedConfig,
   summarizeText,
 } from '../core';
+import { version } from '../../package.json';
 
-const VERSION = '0.2.0';
+const VERSION: string = version;
 
 interface Args {
   command: string;

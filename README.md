@@ -127,6 +127,10 @@ technique = "AML.T0051.000"
 
 The bundled data comes straight from MITRE's official releases ([attack-stix-data](https://github.com/mitre-attack/attack-stix-data) and [atlas-data](https://github.com/mitre-atlas/atlas-data)). Refresh it with `npm run update-mitre`; a monthly workflow does this automatically and opens a PR. Rules that use `mitre_attack_tactic`-style keys get a quick fix to rename them.
 
+## Releasing
+
+Push a version tag (`npm version minor && git push --follow-tags`). The release workflow tests, packages, and publishes to the VS Code Marketplace and Open VSX, and attaches the `.vsix` to a GitHub release. See [docs/releasing.md](docs/releasing.md) for the one-time token setup.
+
 ## Scope and accuracy
 
 - The parser is tolerant and section-oriented, not Google's compiler. It parses all 917 rules in [chronicle/detection-rules](https://github.com/chronicle/detection-rules) and reports a syntax error only in one deprecated rule that really is broken. Use SecOps' `verifyRuleText` API in CI as the final authority (see [docs/ci-cd.md](docs/ci-cd.md)).

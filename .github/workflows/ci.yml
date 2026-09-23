@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [20, 22]
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,7 +35,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx --yes @vscode/vsce package --no-dependencies --allow-missing-repository -o yaral-toolkit.vsix
+      - run: npx vsce package --no-dependencies -o yaral-toolkit.vsix
       - uses: actions/upload-artifact@v4
         with:
           name: yaral-toolkit-vsix
