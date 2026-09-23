@@ -1,0 +1,28 @@
+rule BadRule {
+
+  events:
+    $e.metadata.event_type = "USER_LOGIN"
+    $e.target.user.userid = $user
+    $e.principal.hostname = $unused_host
+    $e.target.user.userid != ""
+    strings.to_lowr($e.principal.hostname) = "x"
+    re.regex($e.target.url, `(?=foo)bar`)
+    $user != ""
+
+  meta:
+    author = "me"
+    sevirity = "High"
+    severity = "high"
+
+  match:
+    $user over 72h
+
+  outcome:
+    $risk_score = max(10)
+    $risk_score = max(20)
+    $hosts = $e.principal.hostname
+    $Bad_Name = array_distinct(strings.concat())
+
+  condition:
+    #e > 12 and $missing
+}

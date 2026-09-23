@@ -1,0 +1,11 @@
+**
+!dist/extension.js
+!dist/cli.js
+!syntaxes/**
+!snippets/**
+!language-configuration.json
+!media/**
+!package.json
+!README.md
+!LICENSE
+!CHANGELOG.md

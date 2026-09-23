@@ -1,0 +1,28 @@
+rule new_admin_group_member {
+
+  meta:
+    author = "Detection Engineering"
+    description = "Detects a user added to a privileged group by an account outside the admin allowlist"
+    rule_id = "mr_1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+    rule_name = "User Added To Privileged Group"
+    severity = "High"
+    priority = "Medium"
+    type = "alert"
+    tactic = "TA0003"
+    technique = "T1098"
+
+  events:
+    $change.metadata.event_type = "GROUP_MODIFICATION"
+    $change.target.group.group_display_name = /(domain|enterprise) admins/ nocase
+    not $change.principal.user.userid in %admin_allowlist
+
+  outcome:
+    $risk_score = 85
+    $event_count = 1
+    $principal_user_userid = $change.principal.user.userid
+    $target_user_userid = $change.target.user.userid
+    $target_group = $change.target.group.group_display_name
+
+  condition:
+    $change
+}

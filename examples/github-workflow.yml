@@ -1,0 +1,38 @@
+# Example workflow for a detection-as-code repository that stores YARA-L rules.
+# Copy to .github/workflows/yaral-lint.yml in your rules repository.
+name: YARA-L rules
+
+on:
+  pull_request:
+    paths: ["**/*.yaral", ".yaral-lint.json"]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write # only needed for the SARIF upload
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Inline PR annotations + job summary; fails on lint errors.
+      - uses: carlsullivan11/Yaral-VScode-Toolkit@main
+        with:
+          paths: rules
+          max-warnings: "25"
+          format-check: "true"
+          sarif-file: yaral.sarif
+
+      # Optional: show findings in the Security > Code scanning tab.
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: yaral.sarif
+          category: yaral-lint
+
+  # Optional: have Google SecOps compile the rules (authoritative syntax check)
+  # before merge, using Google's content_manager tool with Workload Identity
+  # Federation. See docs/ci-cd.md.
